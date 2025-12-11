@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Control Temperaturas Firebase</title>
+
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        background: #0d0d0d;
+        color: white;
+        text-align: center;
+        padding: 20px;
+    }
+
+    .card {
+        background: #1a1a1a;
+        padding: 20px;
+        margin: 20px auto;
+        border-radius: 15px;
+        width: 90%;
+        max-width: 500px;
+        box-shadow: 0 0 15px cyan;
+    }
+
+    button {
+        background: cyan;
+        color: black;
+        border: none;
+        padding: 12px 20px;
+        margin: 6px;
+        font-size: 18px;
+        border-radius: 10px;
+        cursor: pointer;
+    }
+
+    button:hover {
+        background: #00b7ff;
+    }
+
+    .manual-btns button {
+        background: orange;
+    }
+
+    .manual-btns button:hover {
+        background: #ff9d00;
+    }
+
+    .thermo-container {
+        width: 80%;
+        margin: 10px auto;
+        background: #333;
+        border-radius: 20px;
+        height: 25px;
+        overflow: hidden;
+        border: 2px solid cyan;
+    }
+
+    .thermo-bar {
+        height: 100%;
+        width: 0%;
+        background: linear-gradient(90deg, blue, cyan, red);
+        transition: width 1s ease-in-out;
+    }
+
+    .actuador {
+        font-size: 22px;
+        margin: 10px 0;
+    }
+
+    .on {
+        color: #00ff88;
+        font-weight: bold;
+    }
+
+    .off {
+        color: #ff4444;
+        font-weight: bold;
+    }
+
+    #ventilador-icon.on {
+        animation: giro 1s linear infinite;
+    }
+
+    @keyframes giro {
+        from { transform: rotate(0deg); }
+        to   { transform: rotate(360deg); }
+    }
+
+    #calefactor-icon.on {
+        color: red;
+        text-shadow: 0 0 20px red;
+    }
+
+    /* Recuadro de configuración Firebase */
+    #firebase-config {
+        background: #222;
+        padding: 15px;
+        border-radius: 10px;
+        margin-bottom: 20px;
+        border: 2px solid cyan;
+    }
+</style>
+</head>
+<body>
+
+<h1>CONTROL DE TEMPERATURAS FIREBASE</h1>
+
+<div id="firebase-config" class="card">
+    <h2>Configuración Firebase</h2>
+    <label>API Key: <input type="text" id="apiKey" placeholder="Tu API Key"></label><br><br>
+    <label>Database URL: <input type="text" id="databaseURL" placeholder="Tu Database URL"></label><br><br>
+    <button onclick="initFirebase()">Conectar Firebase</button>
+    <p id="status">❌ No conectado</p>
+</div>
+
+<div class="card">
+    <h2>LECTURAS</h2>
+
+    <p>Sensor 1: <span id="t1">0</span> °C</p>
+    <div class="thermo-container"><div id="bar1" class="thermo-bar"></div></div>
+
+    <p>Sensor 2: <span id="t2">0</span> °C</p>
+    <div class="thermo-container"><div id="bar2" class="thermo-bar"></div></div>
+
+    <p>Sensor 3: <span id="t3">0</span> °C</p>
+    <div class="thermo-container"><div id="bar3" class="thermo-bar"></div></div>
+
+    <p>Sensor 4: <span id="t4">0</span> °C</p>
+    <div class="thermo-container"><div id="bar4" class="thermo-bar"></div></div>
+
+    <h3>Temperatura General: <span id="general">0</span> °C</h3>
+    <div class="thermo-container"><div id="barGeneral" class="thermo-bar"></div></div>
+
+    <h3>Modo Actual: <span id="modo">AUTO</span></h3>
+</div>
+
+<div class="card">
+    <h2>MODO</h2>
+    <button onclick="sendCommand('AUTO')">Automático</button>
+    <button id="manual-btn">Manual</button>
+</div>
+
+<div class="card manual-btns">
+    <h2>CONTROL MANUAL</h2>
+    <button onclick="sendCommand('A1_ON')">Ventilador ON</button>
+    <button onclick="sendCommand('A1_OFF')">Ventilador OFF</button><br><br>
+
+    <button onclick="sendCommand('A2_ON')">Calefactor ON</button>
+    <button onclick="sendCommand('A2_OFF')">Calefactor OFF</button>
+</div>
+
+<div class="card">
+    <h2>ESTADO DE ACTUADORES</h2>
+
+    <p class="actuador">Ventilador:
+        <span id="ventilador-icon" class="off">🌀</span>
+        <span id="ventilador-estado" class="off">Apagado</span>
+    </p>
+
+    <p class="actuador">Calefactor:
+        <span id="calefactor-icon" class="off">🔥</span>
+        <span id="calefactor-estado" class="off">Apagado</span>
+    </p>
+</div>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+<script>
+let database;
+
+function initFirebase() {
+    const apiKey = document.getElementById("apiKey").value;
+    const databaseURL = document.getElementById("databaseURL").value;
+
+    if(!apiKey || !databaseURL) {
+        alert("Debes ingresar API Key y Database URL");
+        return;
+    }
+
+    const firebaseConfig = {
+        apiKey: apiKey,
+        authDomain: "dummy.firebaseapp.com",
+        databaseURL: databaseURL,
+        projectId: "dummy",
+        storageBucket: "dummy.appspot.com",
+        messagingSenderId: "dummy",
+        appId: "dummy"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    database = firebase.database();
+
+    document.getElementById("status").innerText = "✅ Conectado a Firebase";
+
+    listenData();
+}
+
+function listenData() {
+    const ref = database.ref("temperaturas");
+
+    ref.on("value", (snapshot) => {
+        const data = snapshot.val();
+        if (!data) return;
+
+        document.getElementById("t1").innerText = data.s1;
+        document.getElementById("t2").innerText = data.s2;
+        document.getElementById("t3").innerText = data.s3;
+        document.getElementById("t4").innerText = data.s4;
+        document.getElementById("general").innerText = data.general;
+        document.getElementById("modo").innerText = data.modo;
+
+        actualizarTermometro("bar1", data.s1);
+        actualizarTermometro("bar2", data.s2);
+        actualizarTermometro("bar3", data.s3);
+        actualizarTermometro("bar4", data.s4);
+        actualizarTermometro("barGeneral", data.general);
+
+        actualizarActuadores(data.general);
+    });
+}
+
+function actualizarTermometro(idBarra, temp) {
+    let porcentaje = Math.max(0, Math.min(100, temp));
+    document.getElementById(idBarra).style.width = porcentaje + "%";
+}
+
+function actualizarActuadores(tGeneral) {
+    let ventilador = document.getElementById("ventilador-icon");
+    let calefactor = document.getElementById("calefactor-icon");
+
+    let ventTxt = document.getElementById("ventilador-estado");
+    let calTxt = document.getElementById("calefactor-estado");
+
+    if (tGeneral > 25) {
+        ventilador.classList.add("on");
+        ventilador.classList.remove("off");
+        ventTxt.innerText = "Encendido";
+        ventTxt.classList = "on";
+
+        calefactor.classList = "off";
+        calTxt.classList = "off";
+        calTxt.innerText = "Apagado";
+    }
+    else if (tGeneral < 20) {
+        calefactor.classList.add("on");
+        calefactor.classList.remove("off");
+        calTxt.innerText = "Encendido";
+        calTxt.classList = "on";
+
+        ventilador.classList = "off";
+        ventTxt.classList = "off";
+        ventTxt.innerText = "Apagado";
+    }
+    else {
+        ventilador.classList = "off";
+        ventTxt.innerText = "Apagado";
+        ventTxt.classList = "off";
+
+        calefactor.classList = "off";
+        calTxt.innerText = "Apagado";
+        calTxt.classList = "off";
+    }
+}
+
+function sendCommand(cmd) {
+    if(!database) {
+        alert("⚠ Primero conecta Firebase");
+        return;
+    }
+    database.ref("comandos").set({cmd: cmd});
+}
+
+// ------------- AÑADIDO MODO MANUAL CON CONTRASEÑA ----------------
+let manualAllowed = false;
+
+document.getElementById("manual-btn").addEventListener("click", () => {
+    const password = prompt("Ingrese la contraseña para modo manual:");
+    if(password === "1234") {
+        manualAllowed = true;
+        alert("🔓 Modo manual activado. Ahora puedes controlar los actuadores.");
+        database.ref("comandos").set({cmd: "MANUAL"});
+    } else {
+        alert("❌ Contraseña incorrecta");
+    }
+});
+
+// Modificamos sendCommand para bloquear comandos manuales si no se ingresó contraseña
+const originalSendCommand = sendCommand;
+sendCommand = function(cmd) {
+    if(["A1_ON","A1_OFF","A2_ON","A2_OFF"].includes(cmd) && !manualAllowed) {
+        alert("⚠ Debes activar el modo manual e ingresar la contraseña primero");
+        return;
+    }
+    originalSendCommand(cmd);
+};
+</script>
+
+</body>
+</html>
